@@ -257,17 +257,26 @@ class AMQPRetryHandler(object):
                 # N.B. default exchange automatically routes messages to a queue
                 # with the same name as the routing key provided.
                 queue_arguments={
+                    **queue_arguments,
                     "x-dead-letter-exchange": "",
                     "x-dead-letter-routing-key": self.queue,
                 },
                 channel=self.channel,
             )
 
+            archive_queue_arguments = {
+                **queue_arguments,
+                **settings.ARCHIVE_QUEUE_ARGS,
+            }
+            if archive_queue_arguments.get('x-queue-type') == 'quorum':
+                'x-message-ttl' in archive_queue_arguments and archive_queue_arguments.pop('x-message-ttl')
+                'x-queue-mode' in archive_queue_arguments and archive_queue_arguments.pop('x-queue-mode')
+
             self.archive_queue = kombu.Queue(
                 name='{queue}.archived'.format(queue=queue),
                 exchange=self.exchanges[DEFAULT_EXCHANGE],
                 routing_key='{queue}.archived'.format(queue=queue),
-                queue_arguments=settings.ARCHIVE_QUEUE_ARGS,
+                queue_arguments=archive_queue_arguments,
                 channel=self.channel,
             )
         except KeyError as key_exc:
